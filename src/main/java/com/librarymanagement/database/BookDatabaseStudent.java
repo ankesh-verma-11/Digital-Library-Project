@@ -9,7 +9,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 public class BookDatabaseStudent {
@@ -27,7 +26,6 @@ public class BookDatabaseStudent {
         ResultSet rs = null;
 
         try {
-            // First query to check if the book is issued to the student
             String query1 = "SELECT BookId, AdminId FROM IssuedBooks WHERE BookId = ? AND StudentId = ?";
             ps = con.prepareStatement(query1);
             ps.setInt(1, bookId);
@@ -239,7 +237,6 @@ public class BookDatabaseStudent {
                     return ALREADY_HAVE;
                }
             } else {
-                // If the issue date is not the current date
                 if (wIssueDate == null && wReturnDate == null) {
                     int resultt = reserveBook(issueBooks);
                     System.out.println("Book reserved for future dates.");
@@ -269,10 +266,8 @@ public class BookDatabaseStudent {
 
     private int issue(IssueBooks issueBooks) {
             int  status =ERROR;
-            PreparedStatement checkStmt;
             ResultSet rs;
             try {
-                // Issue the book
                 String query = "INSERT INTO IssuedBooks (BookId, AdminId, StudentId, IssueDate, ReturnDate) VALUES (?, ?, ?, ?, ?)";
                 PreparedStatement pstmt = con.prepareStatement(query);
                 pstmt.setInt(1, issueBooks.getBookId());
@@ -284,7 +279,6 @@ public class BookDatabaseStudent {
                 status = updateResult > 0 ? 1 : 0;
                 pstmt.close();
 
-                // Update the Books table
                 String q = "SELECT Quantity, IssuedBooks FROM Books WHERE BookId = ?";
                 pstmt = con.prepareStatement(q);
                 pstmt.setInt(1, issueBooks.getBookId());
@@ -310,7 +304,6 @@ public class BookDatabaseStudent {
             return status;
         }
         private int reserveBook(IssueBooks issueBooks) {
-            // Issue the book
             int status = ERROR;
             try
             {
