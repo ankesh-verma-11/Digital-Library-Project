@@ -119,24 +119,20 @@ String status = request.getParameter("status");
 <div class="container">
     <h2>Issue Books Here</h2>
     <form action="IssuedBook" method="post" onsubmit="return validateDates()">
-       <% if ("success".equals(status)) { %>
-           <div class="alert alert-success">Congratulations! The book has been successfully issued to your account.</div>
-
-       <% } else if ("Donot".equals(status)) { %>
-           <div class="alert alert-error">Sorry, all copies of this book have already been issued.</div>
-
-       <% } else if ("have".equals(status)) { %>
-           <div class="alert alert-error">You already have this book issued to your account.</div>
-
-       <% } else if ("booked".equals(status)) { %>
-                      <div class="alert alert-error">Booking successfully</div>
-
-                  <% }
-        else if ("NotAvailable".equals(status)) { %>
-           <div class="alert alert-error">You selected a book that is not available in our library. Please select only available books.</div>
-
+       <%  if(status !=null){ %>
+           <% if ("success".equals(status)) { %>
+               <div class="alert alert-success">Congratulations! The book has been successfully issued to your account.</div>
+           <% } else if ("notAvailable".equals(status)) { %>
+               <div class="alert alert-error">Sorry, all copies of this book have already been issued.</div>
+           <% } else if ("have".equals(status)) { %>
+               <div class="alert alert-error">You already have this book issued to your account.</div>
+           <% } else if ("booked".equals(status)) { %>
+                          <div class="alert alert-error">Booking successfully for future</div>
+                      <% }
+            else if ("notAvailableForDate".equals(status)) { %>
+               <div class="alert alert-error">You selected a book that is not available for selected dates</div>
+           <% } %>
        <% } %>
-
 
         <% if (books != null && !books.isEmpty()) {
             BookStore book = books.get(0); // Assuming you want to display the first book in the list

@@ -15,7 +15,12 @@ import java.util.List;
 
 public class IssueSingleBook extends HttpServlet {
     private BookDatabaseStudent bookDatabase;
-
+    private final  int ERROR = 0;
+    private final  int ISSUE_BOOK = 1;
+    private final  int RESERVE_BOOK = 2;
+    private final  int NOT_AVAILABLE_BOOK = 3;
+    private final  int NOT_AVAILABLE_FOR_SELECTED_DATES = 4;
+    private final int ALREADY_HAVE = 5;
 
     @Override
     public void init() throws ServletException {
@@ -49,18 +54,24 @@ public class IssueSingleBook extends HttpServlet {
             response.sendRedirect("Student/IssueSingleBook.jsp?status=NotAvailable");
         }
         try {
-            int result = bookDatabase.issueBooks(book);
-            if (result == 0) {
+            int  result = bookDatabase.issueBooks(book);
+            System.out.println("message : "+result);
+            if (result == ALREADY_HAVE) {
                 System.out.println("User already has book");
                 response.sendRedirect("Student/IssueSingleBook.jsp?status=have");
-            } else if(result ==-1 ){
-                System.out.println("All the books issued not");
-                response.sendRedirect("Student/IssueSingleBook.jsp?status=Donot");
-            }else if(result ==4 ){
+            } else if(result ==NOT_AVAILABLE_BOOK ){
+                System.out.println("NOT_AVAILABLE_BOOK");
+                response.sendRedirect("Student/IssueSingleBook.jsp?status=notAvailable");
+            }else if(result == NOT_AVAILABLE_FOR_SELECTED_DATES){
+                System.out.println("NOT_AVAILABLE_FOR_SELECTED_DATES");
+                response.sendRedirect("Student/IssueSingleBook.jsp?status=notAvailableForDate");
+            }
+
+            else if(result == RESERVE_BOOK){
                 System.out.println("booking successful");
                 response.sendRedirect("Student/IssueSingleBook.jsp?status=booked");
             }
-            else {
+            else if(result == ISSUE_BOOK){
                 System.out.println("Successfully issued");
                 response.sendRedirect("Student/IssueSingleBook.jsp?status=success");
             }

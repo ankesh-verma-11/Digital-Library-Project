@@ -13,7 +13,14 @@ import java.util.Date;
 import java.util.List;
 
 public class BookDatabaseStudent {
-    private Connection con = ConnectionProvider.getConnection();
+    public Connection con = ConnectionProvider.getConnection();
+    private final  int ERROR = 0;
+    private final  int ISSUE_BOOK = 1;
+    private final  int RESERVE_BOOK = 2;
+    private final  int NOT_AVAILABLE_BOOK = 3;
+    private final  int NOT_AVAILABLE_FOR_SELECTED_DATES = 4;
+    private final int ALREADY_HAVE = 5;
+
     public boolean returnBook(int bookId, String studentId) {
         boolean status = false;
         PreparedStatement ps = null;
@@ -152,42 +159,161 @@ public class BookDatabaseStudent {
     }
 
     public int issueBooks(IssueBooks issueBooks) {
-        int result = 0;
+
+        LocalDate currDate = LocalDate.now();
+        LocalDate issueDate = LocalDate.parse(issueBooks.getIssueDate());
+        LocalDate returnDate = LocalDate.parse(issueBooks.getReturnDate());
+
         try {
-
-            String checkQuery = "SELECT COUNT(*) FROM IssuedBooks WHERE BookId = ? AND StudentId = ?";
-            PreparedStatement checkStmt = con.prepareStatement(checkQuery);
-            checkStmt.setInt(1, issueBooks.getBookId());
-            checkStmt.setString(2, issueBooks.getStudentId());
-            ResultSet rs = checkStmt.executeQuery();
-            if (rs.next() && rs.getInt(1) > 0) {
-                return 0;
+            String checkBookQuery = "SELECT Quantity, IssuedBooks FROM Books WHERE BookId = ?";
+            PreparedStatement checkBookStmt = con.prepareStatement(checkBookQuery);
+            checkBookStmt.setInt(1, issueBooks.getBookId());
+            ResultSet rsBook = checkBookStmt.executeQuery();
+            int totalQuantity = 0;
+            int issuedBooks = 0;
+            if (rsBook.next()) {
+                totalQuantity = rsBook.getInt("Quantity");
+                issuedBooks = rsBook.getInt("IssuedBooks");
             }
 
-//            checkStmt.close();
-//            rs.close();
-//            String qu = "select WIssueDate WReturnDate from IssuedBooks";
-//            checkStmt = con.prepareStatement(qu);
-//            rs = checkStmt.executeQuery();
-//            while(rs.next()){
-//                String wIssueDate = rs.getString("WaitingIssueDate");
-//                String wReturnDate = rs.getString("WaitingReturnDate");
-//
-//            }
-            LocalDate currDate = LocalDate.now();
-            LocalDate issueDate = LocalDate.parse(issueBooks.getIssueDate());
-            if(currDate.isEqual(issueDate)){
-                issue(issueBooks);
+            String checkUserIssuedQuery = "SELECT IssueDate, ReturnDate, WIssueDate, WReturnDate FROM IssuedBooks WHERE BookId = ? AND StudentId = ?";
+            PreparedStatement checkUserIssuedStmt = con.prepareStatement(checkUserIssuedQuery);
+            checkUserIssuedStmt.setInt(1, issueBooks.getBookId());
+            checkUserIssuedStmt.setString(2, issueBooks.getStudentId());
+            ResultSet rsUserIssued = checkUserIssuedStmt.executeQuery();
+            System.out.println("User Exist or not with bookId"+rsUserIssued);
+            boolean bookIssued = false;
+            LocalDate dbIssueDate = null;
+            LocalDate dbReturnDate = null;
+            LocalDate wIssueDate = null;
+            LocalDate wReturnDate = null;
+            if (rsUserIssued.next()) {
+                dbIssueDate = rsUserIssued.getDate("IssueDate") != null ? rsUserIssued.getDate("IssueDate").toLocalDate() : null;
+                dbReturnDate = rsUserIssued.getDate("ReturnDate") != null ? rsUserIssued.getDate("ReturnDate").toLocalDate() : null;
+                wIssueDate = rsUserIssued.getDate("WIssueDate") != null ? rsUserIssued.getDate("WIssueDate").toLocalDate() : null;
+                wReturnDate = rsUserIssued.getDate("WReturnDate") != null ? rsUserIssued.getDate("WReturnDate").toLocalDate() : null;
+
+                if (dbIssueDate != null) {
+                    bookIssued = true;
+                }
+            }else if(issueDate.equals(currDate)&&(issuedBooks < totalQuantity)){
+                System.out.println("successfully issue");
+                int resutlt = issue(issueBooks);
+                if(resutlt == ISSUE_BOOK){
+                    return ISSUE_BOOK;
+                }
+            }else{
+                int result = reserveBook(issueBooks);
+                if(result == 1){
+                    return RESERVE_BOOK;
+                }
+                return ERROR;
             }
-            else {
-//                String checkQuery1 = "SELECT COUNT(*) FROM IssuedBooks WHERE BookId = ? AND StudentId = ?";
-//                PreparedStatement checkStmt1 = con.prepareStatement(checkQuery1);
-//                checkStmt1.setInt(1, issueBooks.getBookId());
-//                checkStmt1.setString(2, issueBooks.getStudentId());
-//                ResultSet rs1 = checkStmt.executeQuery();
-//                if (rs1.next() && rs1.getInt(1) > 0) {
-//                    return 0;
-//                }
+            if (issuedBooks >= totalQuantity) {
+                System.out.println("NOT_AVAILABLE_BOOK");
+                return NOT_AVAILABLE_BOOK;
+            }
+            if (issueDate.isEqual(currDate)) {
+                if ((dbIssueDate == null && dbReturnDate == null) || (wIssueDate == null && wReturnDate == null)) {
+                    System.out.println("successfully issue");
+                    int resutlt = issue(issueBooks);
+                    if(resutlt == ISSUE_BOOK){
+                        return ISSUE_BOOK;
+                    }
+                    return ERROR;
+                }
+                else if ((dbIssueDate == null && dbReturnDate == null) && (wIssueDate != null && returnDate.isBefore(wIssueDate))) {
+                    System.out.println("successfully issue");
+                    int resutlt = issue(issueBooks);
+                    if(resutlt == ISSUE_BOOK){
+                        return ISSUE_BOOK;
+                    }
+                    return ERROR;
+                }
+               else if (returnDate.isAfter(wIssueDate)) {
+                    System.out.println("Book not available for the selected dates.");
+                    return NOT_AVAILABLE_FOR_SELECTED_DATES;
+               }
+               else if(bookIssued){
+                    System.out.println("book already you have");
+                    return ALREADY_HAVE;
+               }
+            } else {
+                // If the issue date is not the current date
+                if (wIssueDate == null && wReturnDate == null) {
+                    int resultt = reserveBook(issueBooks);
+                    System.out.println("Book reserved for future dates.");
+                    if(resultt == 1) return RESERVE_BOOK;
+                    return ERROR;
+                } else if (issueDate.isBefore(wIssueDate) && returnDate.isBefore(wIssueDate)) {
+                    int resultt = reserveBook(issueBooks);
+                    System.out.println("Book reserved for future dates.");
+                    if(resultt == 1) return RESERVE_BOOK;
+                    return ERROR;
+                } else if (issueDate.isAfter(wIssueDate) && issueDate.isAfter(wIssueDate)) {
+                    int resultt = reserveBook(issueBooks);
+                    System.out.println("Book reserved for future dates.");
+                    if(resultt == 1) return RESERVE_BOOK;
+                    return ERROR;
+                }else {
+                    System.out.println("Book not available for the selected dates.");
+                    return NOT_AVAILABLE_FOR_SELECTED_DATES;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+
+        }
+        return ERROR;
+    }
+
+    private int issue(IssueBooks issueBooks) {
+            int  status =ERROR;
+            PreparedStatement checkStmt;
+            ResultSet rs;
+            try {
+                // Issue the book
+                String query = "INSERT INTO IssuedBooks (BookId, AdminId, StudentId, IssueDate, ReturnDate) VALUES (?, ?, ?, ?, ?)";
+                PreparedStatement pstmt = con.prepareStatement(query);
+                pstmt.setInt(1, issueBooks.getBookId());
+                pstmt.setString(2, issueBooks.getAdminId());
+                pstmt.setString(3, issueBooks.getStudentId());
+                pstmt.setString(4, issueBooks.getIssueDate());
+                pstmt.setString(5, issueBooks.getReturnDate());
+                int updateResult = pstmt.executeUpdate();
+                status = updateResult > 0 ? 1 : 0;
+                pstmt.close();
+
+                // Update the Books table
+                String q = "SELECT Quantity, IssuedBooks FROM Books WHERE BookId = ?";
+                pstmt = con.prepareStatement(q);
+                pstmt.setInt(1, issueBooks.getBookId());
+                rs = pstmt.executeQuery();
+                if (rs.next()) {
+                    int totalCount = rs.getInt("Quantity");
+                    int issuedBook = rs.getInt("IssuedBooks");
+                    if (totalCount > issuedBook) {
+                        String query1 = "UPDATE Books SET IssuedBooks = ? WHERE BookId = ?";
+                        pstmt = con.prepareStatement(query1);
+                        pstmt.setInt(1, issuedBook + 1);
+                        pstmt.setInt(2, issueBooks.getBookId());
+                         updateResult = pstmt.executeUpdate();
+                        status = updateResult > 0 ? 1 : 0;
+                    } else {
+                        status = 0;
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                status = 0;
+            }
+            return status;
+        }
+        private int reserveBook(IssueBooks issueBooks) {
+            // Issue the book
+            int status = ERROR;
+            try
+            {
                 String query = "INSERT INTO IssuedBooks (BookId, AdminId, StudentId, WIssueDate, WReturnDate) VALUES (?, ?, ?, ?, ?)";
                 PreparedStatement pstmt = con.prepareStatement(query);
                 pstmt.setInt(1, issueBooks.getBookId());
@@ -195,95 +321,17 @@ public class BookDatabaseStudent {
                 pstmt.setString(3, issueBooks.getStudentId());
                 pstmt.setString(4, issueBooks.getIssueDate());
                 pstmt.setString(5, issueBooks.getReturnDate());
-                pstmt.executeUpdate();
+                int updateResult = pstmt.executeUpdate();
+                status = updateResult > 0 ? 1 : 0;
                 pstmt.close();
-                rs.close();
-                result =4;
-//                String q = "Select Quantity ,IssuedBooks from Books where BookId =?";
-//                pstmt = con.prepareStatement(q);
-//                pstmt.setInt(1,issueBooks.getBookId());
-//                rs = pstmt.executeQuery();
-
-//                if(rs.next()){
-//                    int totalCount = rs.getInt("Quantity");
-//                    int issuedBook = rs.getInt("IssuedBooks");
-//                    if(totalCount>issuedBook)
-//                    {
-//                        String query1 = "Update Books set IssuedBooks =? where MembershipId =? and BookId =? ";
-//                        pstmt = con.prepareStatement(query1);
-//                        pstmt.setInt(1,issuedBook+1);
-//                        pstmt.setString(2,issueBooks.getAdminId());
-//                        pstmt.setInt(3,issueBooks.getBookId());
-//                        result = pstmt.executeUpdate();
-//                        if(result>0)
-//                            return result;
-//                    }else {
-//                        return -1;
-//                    }
-//                }
+            }catch (Exception e){
+                e.printStackTrace();
+                status = 0;
             }
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-            result =0;
+            return status;
         }
-        System.out.println("result :"+result);
-        return result;
-    }
 
-
-    public int issue(IssueBooks issueBooks)
-    {
-        int result;
-        PreparedStatement checkStmt;
-        ResultSet rs;
-        try{
-            String checkQuery1 = "SELECT COUNT(*) FROM IssuedBooks WHERE BookId = ? AND StudentId = ? ";
-            checkStmt = con.prepareStatement(checkQuery1);
-            checkStmt.setInt(1, issueBooks.getBookId());
-            checkStmt.setString(2, issueBooks.getStudentId());
-            rs = checkStmt.executeQuery();
-            if (rs.next() && rs.getInt(1) > 0) {
-                return 0;
-            }
-            String query = "INSERT INTO IssuedBooks (BookId, AdminId, StudentId, IssueDate, ReturnDate) VALUES (?, ?, ?, ?, ?)";
-            PreparedStatement pstmt = con.prepareStatement(query);
-            pstmt.setInt(1, issueBooks.getBookId());
-            pstmt.setString(2, issueBooks.getAdminId());
-            pstmt.setString(3, issueBooks.getStudentId());
-            pstmt.setString(4, issueBooks.getIssueDate());
-            pstmt.setString(5, issueBooks.getReturnDate());
-            pstmt.executeUpdate();
-            pstmt.close();
-            String q = "Select Quantity ,IssuedBooks from Books where BookId =?";
-            pstmt = con.prepareStatement(q);
-            pstmt.setInt(1,issueBooks.getBookId());
-            rs = pstmt.executeQuery();
-            if(rs.next()){
-                int totalCount = rs.getInt("Quantity");
-                int issuedBook = rs.getInt("IssuedBooks");
-                if(totalCount>issuedBook)
-                {
-                    String query1 = "Update Books set IssuedBooks =? where MembershipId =? and BookId =? ";
-                    pstmt = con.prepareStatement(query1);
-                    pstmt.setInt(1,issuedBook+1);
-                    pstmt.setString(2,issueBooks.getAdminId());
-                    pstmt.setInt(3,issueBooks.getBookId());
-                    result = pstmt.executeUpdate();
-                    if(result>0)
-                        return result;
-                }else {
-                    return -1;
-                }
-            }
-        }catch (Exception e){
-            e.printStackTrace();
-        }
-        return 1;
-
-    }
-
-    public List<BookStore> getAllBook()  {
+        public List<BookStore> getAllBook()  {
         List<BookStore> bookList = new ArrayList<>();
         if (con == null) {
             System.out.println("Database connection is null");
@@ -327,8 +375,11 @@ public class BookDatabaseStudent {
                 String Address = rs.getString("Address");
                 String IssuedDate = rs.getString("IssueDate");
                 String ReturnDate = rs.getString("ReturnDate");
-                IssueBooks issueBooks = new IssueBooks(BookId, AdminId, Library, Address,BookName,IssuedDate, ReturnDate);
-                studentBooks.add(issueBooks);
+                if(IssuedDate != null && ReturnDate != null){
+                    IssueBooks issueBooks = new IssueBooks(BookId, AdminId, Library, Address,BookName,IssuedDate, ReturnDate);
+                    studentBooks.add(issueBooks);
+                }
+
             }
         } catch (Exception e) {
             e.printStackTrace();
