@@ -179,7 +179,7 @@ public class BookDatabaseStudent {
             checkUserIssuedStmt.setInt(1, issueBooks.getBookId());
             checkUserIssuedStmt.setString(2, issueBooks.getStudentId());
             ResultSet rsUserIssued = checkUserIssuedStmt.executeQuery();
-            System.out.println("User Exist or not with bookId"+rsUserIssued);
+            System.out.println("User Exist or not with bookId :");
             boolean bookIssued = false;
             LocalDate dbIssueDate = null;
             LocalDate dbReturnDate = null;
@@ -193,27 +193,20 @@ public class BookDatabaseStudent {
 
                 if (dbIssueDate != null) {
                     bookIssued = true;
+                    System.out.println("have not not :"+bookIssued);
+                    if(bookIssued && currDate.equals(issueDate))
+                        return ALREADY_HAVE;
                 }
-            }else if(issueDate.equals(currDate)&&(issuedBooks < totalQuantity)){
-                System.out.println("successfully issue");
+            }else if((issuedBooks < totalQuantity) && issueDate.equals(currDate)){
+                System.out.println("if user not exist with that book id issue date is currdate then issue");
                 int resutlt = issue(issueBooks);
-                if(resutlt == ISSUE_BOOK){
+                if(resutlt == 1 ){
                     return ISSUE_BOOK;
                 }
-            }else{
-                int result = reserveBook(issueBooks);
-                if(result == 1){
-                    return RESERVE_BOOK;
-                }
-                return ERROR;
             }
-            if (issuedBooks >= totalQuantity) {
-                System.out.println("NOT_AVAILABLE_BOOK");
-                return NOT_AVAILABLE_BOOK;
-            }
-            if (issueDate.isEqual(currDate)) {
-                if ((dbIssueDate == null && dbReturnDate == null) || (wIssueDate == null && wReturnDate == null)) {
-                    System.out.println("successfully issue");
+            if ( issueDate.isEqual(currDate) && (issuedBooks < totalQuantity)){
+                if ((dbIssueDate == null && dbReturnDate == null) && (wIssueDate != null && wReturnDate != null)) {
+                    System.out.println("successfully issue when null");
                     int resutlt = issue(issueBooks);
                     if(resutlt == ISSUE_BOOK){
                         return ISSUE_BOOK;
@@ -228,7 +221,7 @@ public class BookDatabaseStudent {
                     }
                     return ERROR;
                 }
-               else if (returnDate.isAfter(wIssueDate)) {
+               else if ((dbIssueDate == null && dbReturnDate == null) && returnDate.isAfter(wIssueDate)) {
                     System.out.println("Book not available for the selected dates.");
                     return NOT_AVAILABLE_FOR_SELECTED_DATES;
                }
@@ -236,30 +229,43 @@ public class BookDatabaseStudent {
                     System.out.println("book already you have");
                     return ALREADY_HAVE;
                }
-            } else {
+            }else if(!currDate.equals(issueDate)){
                 if (wIssueDate == null && wReturnDate == null) {
-                    int resultt = reserveBook(issueBooks);
-                    System.out.println("Book reserved for future dates.");
-                    if(resultt == 1) return RESERVE_BOOK;
-                    return ERROR;
+                    boolean available =  bookAvailability(issueBooks);
+                    if(available){
+                        int resultt = reserveBook(issueBooks);
+                        System.out.println("Book reserved for future dates.");
+                        if(resultt == 1) return RESERVE_BOOK;
+                        else  return ERROR;
+                    }
+                    return NOT_AVAILABLE_FOR_SELECTED_DATES;
                 } else if (issueDate.isBefore(wIssueDate) && returnDate.isBefore(wIssueDate)) {
-                    int resultt = reserveBook(issueBooks);
-                    System.out.println("Book reserved for future dates.");
-                    if(resultt == 1) return RESERVE_BOOK;
-                    return ERROR;
-                } else if (issueDate.isAfter(wIssueDate) && issueDate.isAfter(wIssueDate)) {
-                    int resultt = reserveBook(issueBooks);
-                    System.out.println("Book reserved for future dates.");
-                    if(resultt == 1) return RESERVE_BOOK;
-                    return ERROR;
+                    boolean available =  bookAvailability(issueBooks);
+                    if(available){
+                        int resultt = reserveBook(issueBooks);
+                        System.out.println("Book reserved for future dates.");
+                        if(resultt == 1) return RESERVE_BOOK;
+                        else  return ERROR;
+                    }
+                    return NOT_AVAILABLE_FOR_SELECTED_DATES;
+                } else if (issueDate.isAfter(wIssueDate) && returnDate.isAfter(wIssueDate)) {
+                    boolean available =  bookAvailability(issueBooks);
+                    if(available){
+                        int resultt = reserveBook(issueBooks);
+                        System.out.println("Book reserved for future dates.");
+                        if(resultt == 1) return RESERVE_BOOK;
+                        else  return ERROR;
+                    }
+                    return NOT_AVAILABLE_FOR_SELECTED_DATES;
                 }else {
                     System.out.println("Book not available for the selected dates.");
                     return NOT_AVAILABLE_FOR_SELECTED_DATES;
                 }
+            }else {
+                return NOT_AVAILABLE_BOOK;
             }
         } catch (SQLException e) {
             e.printStackTrace();
-
         }
         return ERROR;
     }
@@ -322,6 +328,55 @@ public class BookDatabaseStudent {
                 status = 0;
             }
             return status;
+        }
+        private  boolean bookAvailability(IssueBooks issueBooks)
+        {
+            LocalDate issueDate = LocalDate.parse(issueBooks.getIssueDate());
+            LocalDate returnDate = LocalDate.parse(issueBooks.getReturnDate());
+            try{
+                String checkUserIssuedQuery = "SELECT IssueDate, ReturnDate, WIssueDate, WReturnDate FROM IssuedBooks WHERE BookId =  ?";
+                PreparedStatement checkUserIssuedStmt = con.prepareStatement(checkUserIssuedQuery);
+                checkUserIssuedStmt.setInt(1, issueBooks.getBookId());
+               // checkUserIssuedStmt.setString(2, issueBooks.getStudentId());
+                ResultSet rsUserIssued = checkUserIssuedStmt.executeQuery();
+                LocalDate dbIssueDate = null;
+                LocalDate dbReturnDate = null;
+                LocalDate wIssueDate = null;
+                LocalDate wReturnDate = null;
+                while (rsUserIssued.next())
+                {
+                    dbIssueDate = rsUserIssued.getDate("IssueDate") != null ? rsUserIssued.getDate("IssueDate").toLocalDate() : null;
+                    dbReturnDate = rsUserIssued.getDate("ReturnDate") != null ? rsUserIssued.getDate("ReturnDate").toLocalDate() : null;
+                    wIssueDate = rsUserIssued.getDate("WIssueDate") != null ? rsUserIssued.getDate("WIssueDate").toLocalDate() : null;
+                    wReturnDate = rsUserIssued.getDate("WReturnDate") != null ? rsUserIssued.getDate("WReturnDate").toLocalDate() : null;
+                    System.out.println("issueDate :"+issueDate);
+                    System.out.println("returnDate :"+returnDate);
+                    System.out.println("dbIssueDate :"+dbIssueDate);
+                    System.out.println("dbreturn date :"+dbReturnDate);
+                    if((dbIssueDate == null && dbReturnDate == null)){
+                        return true;
+                    }
+                    else if(issueDate.isBefore(dbIssueDate) && returnDate.isBefore(dbIssueDate))
+                    {
+                        return true;
+                    }else if(issueDate.isAfter(dbReturnDate) && returnDate.isBefore(dbReturnDate)){
+                        return true;
+                    }else if((wIssueDate == null && wReturnDate == null)){
+                     return true;
+                    } else if(issueDate.isBefore(wIssueDate) && returnDate.isBefore(wReturnDate)){
+                        return true;
+                    }else if(issueDate.isAfter(wReturnDate) && returnDate.isAfter(wReturnDate)){
+                        return true;
+                    }else{
+                        return false;
+                    }
+                }if(!rsUserIssued.next()){
+                    return true;
+                }
+            }catch (Exception e){
+                e.printStackTrace();
+            }
+          return  false;
         }
 
         public List<BookStore> getAllBook()  {
@@ -448,4 +503,5 @@ public class BookDatabaseStudent {
         }
         return studentBooks;
     }
+
 }

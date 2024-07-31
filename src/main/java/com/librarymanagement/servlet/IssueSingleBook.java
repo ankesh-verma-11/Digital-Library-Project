@@ -41,7 +41,8 @@ public class IssueSingleBook extends HttpServlet {
         String studentId = request.getParameter("studentId");
         String issueDate = request.getParameter("issue_date");
         String returnDate = request.getParameter("return_date");
-
+        System.out.println("IssueDate :"+issueDate);
+        System.out.println("ReturnDate :"+returnDate);
         IssueBooks book = new IssueBooks();
         book.setBookId(bookId);
         book.setAdminId(adminId);

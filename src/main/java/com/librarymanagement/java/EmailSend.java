@@ -51,7 +51,7 @@ public class EmailSend {
             message1.addRecipients(Message.RecipientType.TO, String.valueOf(new InternetAddress(userEmail)));
             // adding subject to message
             message1.setSubject(subject);
-            //addind text to message
+            //adding text to message
             message1.setText(message);
             //step 3
              Transport.send(message1);
@@ -193,7 +193,6 @@ public class EmailSend {
 
             MimeBodyPart textMine = new MimeBodyPart();
             MimeBodyPart fileMine = new MimeBodyPart();
-
             try{
                 textMine.setText(message);
 
@@ -208,11 +207,8 @@ public class EmailSend {
             }
             // attachment set
             message1.setContent(mimeMultipart);
-
-
             //step 3
             Transport.send(message1);
-
             System.out.println("Message Sent.......");
 
         } catch (Exception e)
